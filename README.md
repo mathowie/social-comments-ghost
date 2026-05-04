@@ -1,45 +1,30 @@
 # Ghost Social Replies
 
-Show Mastodon and Bluesky replies as comments on your Ghost blog posts.
+This code was designed to let you display Mastodon and Bluesky replies as comments on your Ghost blog's posts.
 
-A two-part add-on for any Ghost theme:
+It's a two-part add-on for any Ghost theme:
 
 - **Theme integration** — drop-in CSS + JS that fetches social posts and renders them as comment-style cards below your post body
-- **Helper tool** — optional web UI for adding/removing reply URLs without hand-editing JSON
+- **Helper tool** — A web UI for adding/removing reply URLs without having to hand-edit JSON, a local version as well as a hosted version
 
-Both are vanilla, dependency-free, MIT licensed.
+Both are vanilla, dependency-free, and MIT licensed.
 
 ## Why?
 
-Many Ghost bloggers cross-post to Mastodon and Bluesky. Their best discussions happen in those replies — but blog readers never see them. This tool surfaces those threads on the post itself, fetched live from the source platforms (no scraping, no copies).
+Many Ghost bloggers share their latest blog posts on Mastodon and Bluesky. But then the best discussions often happen in those social replies — where readers of a blog might never see them. This tool helps you as the author surface those threads on your posts, fetched live from the source platforms (no scraping, no copies).
 
 ## What it looks like
 
-```
-┌─────────────────────────────────────────────────────┐
-│  ───  Replies from the social web  ───              │
-│                                                     │
-│   👤  Bruce Oberg  · @bruce@xoxo.zone   Apr 21      │
-│       great stuff... happy to see I do most of      │
-│       these already. The AppleTV tip is a new one   │
-│       to me — going to steal that for my next trip. │
-│                                                     │
-│   ───────────────────────────────────────────────   │
-│                                                     │
-│   👤  Cassie  · @cass@mstdn.social      Apr 21      │
-│       Travel routers are also useful for getting    │
-│       around those "1 device per room" paywalls     │
-│       that some hotels still pull.                  │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-```
+Here's a screenshot of what it looks like in action on https://a.wholelottanothing.org/
 
-## How it works (briefly)
+![Sample screenshot](samples/sample-screenshot.png)
 
-1. **Per-post URL list** lives in the post's Code Injection footer as a small JSON blob (`{"replies": ["url1", "url2"]}`)
+## How it works
+
+1. **Per-post mentions URL list** lives in the post's Code Injection footer as a small JSON blob (`{"replies": ["url1", "url2"]}`)
 2. **Theme template** has an empty `<section>` placeholder where replies render
-3. **Client-side JS** reads the URL list, fetches each post via Mastodon and Bluesky's public APIs (CORS-enabled, no auth needed), and renders styled cards
-4. **Optional helper tool** provides a web UI for managing the URL lists
+3. **Client-side JS** reads the mentions URL list, fetches each post via Mastodon and Bluesky's public APIs (CORS-enabled, no auth needed), and renders styled cards
+4. **Optional helper tool** provides a web UI for managing a mentions by URL list
 
 For a deeper architecture explainer, see [`docs/architecture.md`](docs/architecture.md).
 
@@ -51,12 +36,16 @@ See [`theme/INTEGRATION.md`](theme/INTEGRATION.md) for step-by-step instructions
 
 ### 2. (Optional) Install the helper tool
 
-See [`helper/README.md`](helper/README.md) for setup. This is purely optional — you can skip it and hand-edit the JSON in Ghost admin if you prefer.
+See [`helper/README.md`](helper/README.md) for setup. You can either host a PHP version with your credentials saved in it on your own server (so it's availble anywhere on earth for you), or you can stick with a client-side HTML version to automatically write the JSON mentions list for you.
 
 Two flavors are included:
 
-- **`helper/replies-helper.html` + `helper/ghost-replies-proxy.php`** — the full helper, requires a PHP-capable server.
-- **`helper/replies-helper-standalone.html`** — a single self-contained file. No server needed. Offline mode builds the script block for you to paste into Ghost manually; an opt-in direct mode talks to Ghost's Admin API straight from the browser (in-browser JWT, CORS permitting).
+- **`helper/replies-helper.html` + `helper/ghost-replies-proxy.php`** — the full helper, requires a PHP-capable server and your Ghost API information and automatically appends any social mentions to your post instantly.
+- **`helper/replies-helper-standalone.html`** — a single self-contained file. No server needed. Offline mode builds the script block that you'll paste into Ghost manually. There's also an opt-in direct mode that talks to Ghost's Admin API straight from the browser (in-browser JWT, CORS permitting), skipping the copy/paste step.
+
+### 2. Get your Ghost API key for your blog
+
+To save your settings in either Helper, go to your Ghost blog's settings, then the Integrations. Create a new custom integration, give it a name, then copy the Admin API key as well as the API URL to save in the helper app's code.
 
 ## Adding replies to a post (no helper)
 
