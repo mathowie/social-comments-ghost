@@ -1,0 +1,11 @@
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+node_modules/
+.idea/
+.vscode/
+
+# Don't commit configured proxy with secrets
+helper/ghost-replies-proxy.local.php

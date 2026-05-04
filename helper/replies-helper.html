@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ghost Social Replies — Helper</title>
+<style>
+  :root {
+    --paper: #f6f1e8;
+    --paper-dim: #ede7da;
+    --page-bg: #fdfbf6;
+    --ink: #1a1512;
+    --ink-soft: #463e36;
+    --ink-muted: #78706a;
+    --rule: #d9d1c0;
+    --accent: #b4421a;
+    --bad: #a03225;
+    --good: #2e7a4e;
+    --mastodon: #5655c4;
+    --bluesky: #0085ff;
+    --font-serif: 'Fraunces', Georgia, serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--page-bg); color: var(--ink); font-family: var(--font-sans); }
+  body {
+    min-height: 100vh;
+    padding: 2.5rem 1.5rem 4rem;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    font-size: clamp(1.8rem, 4vw, 2.4rem);
+    letter-spacing: -0.02em;
+    margin-bottom: 0.5rem;
+  }
+  h1 em { color: var(--accent); font-weight: 300; }
+  .subtitle {
+    color: var(--ink-muted);
+    font-size: 0.95rem;
+    margin-bottom: 2rem;
+    line-height: 1.45;
+  }
+  label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 0.5rem;
+  }
+  textarea, input[type=search], select {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: var(--ink);
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input[type=search], select { font-family: var(--font-sans); }
+  textarea { min-height: 130px; resize: vertical; }
+  textarea:focus, input[type=search]:focus, select:focus { border-color: var(--accent); }
+  textarea[readonly] { background: var(--paper-dim); font-size: 0.78rem; min-height: 90px; }
+  .help { color: var(--ink-muted); font-size: 0.82rem; margin-top: 0.5rem; line-height: 1.5; }
+  .section { margin-bottom: 1.75rem; }
+  .section-head {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  .count {
+    display: inline-block;
+    margin-left: auto;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: var(--paper-dim);
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+  }
+  .post-picker { position: relative; }
+  .post-list {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 0.25rem;
+    max-height: 260px;
+    overflow-y: auto;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    z-index: 10;
+    box-shadow: 0 6px 20px -10px rgba(26,21,18,0.3);
+  }
+  .post-list.is-open { display: block; }
+  .post-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--rule);
+    padding: 0.65rem 0.85rem;
+    cursor: pointer;
+    color: var(--ink);
+    font-family: var(--font-sans);
+  }
+  .post-item:hover, .post-item.is-active {
+    background: var(--paper-dim);
+    color: var(--accent);
+  }
+  .post-item:last-child { border-bottom: none; }
+  .post-item-title { font-size: 0.88rem; font-weight: 500; }
+  .post-item-meta { font-size: 0.73rem; color: var(--ink-muted); margin-top: 0.15rem; }
+  .selected-post {
+    padding: 0.85rem 1rem;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    display: none;
+  }
+  .selected-post.is-shown { display: block; }
+  .selected-post-title { font-weight: 600; font-size: 0.95rem; color: var(--ink); }
+  .selected-post-meta { font-size: 0.78rem; color: var(--ink-muted); margin-top: 0.2rem; font-family: var(--font-mono); }
+  .selected-post-link {
+    margin-top: 0.5rem;
+    font-size: 0.78rem;
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .selected-post-link:hover { text-decoration: underline; }
+  .status-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin: 1rem 0 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+  }
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.45rem 0.7rem;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    word-break: break-all;
+    line-height: 1.35;
+  }
+  .status-row.invalid { color: var(--bad); background: #a032251a; border-color: #a0322540; }
+  .status-row.existing { background: #2e7a4e10; border-color: #2e7a4e30; }
+  .status-row.removing {
+    background: #a032251a;
+    border-color: #a0322540;
+  }
+  .status-row.removing .status-url {
+    text-decoration: line-through;
+    color: var(--bad);
+    opacity: 0.7;
+  }
+  .row-remove {
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    color: var(--ink-muted);
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s, color 0.15s;
+  }
+  .row-remove:hover {
+    background: var(--bad);
+    color: var(--paper);
+  }
+  .row-remove[data-action="undo"] {
+    width: auto;
+    padding: 0 0.65rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    height: 24px;
+    color: var(--bad);
+  }
+  .row-remove[data-action="undo"]:hover {
+    background: var(--paper-dim);
+    color: var(--ink);
+  }
+  .status-badge {
+    flex-shrink: 0;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    min-width: 78px;
+    text-align: center;
+  }
+  .status-badge[data-kind="mastodon"] { background: #6364ff1a; color: var(--mastodon); }
+  .status-badge[data-kind="bluesky"] { background: #0085ff1a; color: var(--bluesky); }
+  .status-badge[data-kind="invalid"] { background: #a032251a; color: var(--bad); }
+  .status-badge[data-kind="existing"] { background: #2e7a4e1a; color: var(--good); }
+  .status-url { flex: 1; min-width: 0; }
+  .actions {
+    display: flex;
+    gap: 0.65rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+  button {
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 0.75rem 1.4rem;
+    border: 1px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s, opacity 0.15s;
+  }
+  button:hover { background: var(--accent); border-color: var(--accent); }
+  button:active { transform: scale(0.98); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.secondary {
+    background: transparent;
+    color: var(--ink);
+  }
+  button.secondary:hover {
+    background: var(--paper-dim);
+    color: var(--ink);
+    border-color: var(--ink);
+  }
+  button.success { background: var(--good); border-color: var(--good); }
+  button.error { background: var(--bad); border-color: var(--bad); }
+  .toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.85rem 1.5rem;
+    border-radius: 999px;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    font-weight: 500;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .toast.is-shown { opacity: 1; }
+  .toast.success { background: var(--good); }
+  .toast.error { background: var(--bad); }
+  details {
+    margin-top: 2rem;
+    padding: 1rem 1.2rem;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+  }
+  details summary {
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    user-select: none;
+    color: var(--ink-soft);
+  }
+  details summary:hover { color: var(--accent); }
+  details p { margin: 0.75rem 0; font-size: 0.88rem; line-height: 1.6; color: var(--ink-soft); }
+  details code {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    padding: 0.1rem 0.35rem;
+    background: var(--paper-dim);
+    border-radius: 2px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Social Replies <em>Helper</em></h1>
+  <p class="subtitle">
+    Pick a blog post, paste reply URLs from Mastodon or Bluesky, click Save.
+    The post's Code Injection footer is updated on Ghost directly.
+  </p>
+
+  <!-- 1. Pick a post -->
+  <div class="section post-picker">
+    <label for="postSearch">Pick a post</label>
+    <input type="search" id="postSearch" placeholder="Type to search recent posts..." autocomplete="off">
+    <div class="post-list" id="postList"></div>
+    <div class="help" id="loadingMsg" style="display:none;">Loading recent posts from Ghost…</div>
+  </div>
+
+  <div class="section">
+    <div class="selected-post" id="selectedPost">
+      <div class="selected-post-title" id="selectedPostTitle"></div>
+      <div class="selected-post-meta" id="selectedPostMeta"></div>
+      <a class="selected-post-link" id="selectedPostLink" target="_blank" rel="noopener">View live post →</a>
+    </div>
+  </div>
+
+  <!-- 2. Existing replies on this post (read from Ghost) -->
+  <div class="section" id="existingSection" style="display:none;">
+    <div class="section-head">
+      <label>Currently on this post</label>
+      <span class="count" id="existingCount">0</span>
+    </div>
+    <div class="status-list" id="existingList"></div>
+  </div>
+
+  <!-- 3. URLs to add -->
+  <div class="section">
+    <div class="section-head">
+      <label for="urls">Reply URLs (paste new ones here)</label>
+      <span class="count" id="newCount">0</span>
+    </div>
+    <textarea id="urls" placeholder="https://mastodon.social/@matt/123&#10;https://bsky.app/profile/matt.bsky.social/post/abc" autocomplete="off" spellcheck="false"></textarea>
+    <div class="help">One URL per line. URLs already saved on this post will be detected and merged automatically.</div>
+  </div>
+
+  <div class="section" id="newStatusSection" style="display:none;">
+    <label>Detected</label>
+    <div class="status-list" id="newStatusList"></div>
+  </div>
+
+  <div class="actions">
+    <button id="saveBtn" type="button" disabled>Save to Ghost</button>
+    <button id="clearBtn" type="button" class="secondary">Clear new URLs</button>
+  </div>
+
+  <details>
+    <summary>What this does</summary>
+    <p>This tool talks to Ghost through a small PHP proxy
+    (so the Admin API key stays server-side). When you save, it does three
+    things:</p>
+    <p>1. Fetches the post's current <code>codeinjection_foot</code> field.<br>
+    2. Merges new valid URLs with any already-saved URLs (no duplicates).<br>
+    3. Writes the updated JSON block back to Ghost.</p>
+    <p>The change is live on the blog immediately — no template updates needed.</p>
+  </details>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  // The PHP proxy on your Synology. If you serve this HTML from the same
+  // origin, this can be a relative path. Otherwise use the full URL.
+  var PROXY_URL = 'ghost-replies-proxy.php';
+
+  var allPosts = [];
+  var selectedPost = null;          // { id, title, slug, url, codeinjection_foot, updated_at }
+  var existingUrls = [];            // URLs already in this post's footer JSON
+  var pendingDeletions = new Set(); // URLs the user has marked for removal (not committed yet)
+
+  var els = {
+    postSearch: document.getElementById('postSearch'),
+    postList: document.getElementById('postList'),
+    loadingMsg: document.getElementById('loadingMsg'),
+    selectedPost: document.getElementById('selectedPost'),
+    selectedPostTitle: document.getElementById('selectedPostTitle'),
+    selectedPostMeta: document.getElementById('selectedPostMeta'),
+    selectedPostLink: document.getElementById('selectedPostLink'),
+    existingSection: document.getElementById('existingSection'),
+    existingList: document.getElementById('existingList'),
+    existingCount: document.getElementById('existingCount'),
+    urls: document.getElementById('urls'),
+    newCount: document.getElementById('newCount'),
+    newStatusSection: document.getElementById('newStatusSection'),
+    newStatusList: document.getElementById('newStatusList'),
+    saveBtn: document.getElementById('saveBtn'),
+    clearBtn: document.getElementById('clearBtn'),
+    toast: document.getElementById('toast'),
+  };
+
+  // ---- Toast notification ------------------------------------------------
+  var toastTimer;
+  function toast(msg, kind) {
+    clearTimeout(toastTimer);
+    els.toast.textContent = msg;
+    els.toast.className = 'toast is-shown ' + (kind || '');
+    toastTimer = setTimeout(function () {
+      els.toast.classList.remove('is-shown');
+    }, 3500);
+  }
+
+  // ---- Classify URL ------------------------------------------------------
+  function classify(url) {
+    try {
+      var u = new URL(url);
+      if (u.host === 'bsky.app' || u.host.endsWith('.bsky.app')) {
+        if (/^\/profile\/[^/]+\/post\/[^/]+/.test(u.pathname)) return 'bluesky';
+        return 'invalid';
+      }
+      if (/^\/(@[^/]+|users\/[^/]+\/statuses)\/\d+/.test(u.pathname)) return 'mastodon';
+      return 'invalid';
+    } catch (e) { return 'invalid'; }
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, function (c) {
+      return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+    });
+  }
+
+  function fmtDate(iso) {
+    try {
+      return new Date(iso).toLocaleDateString(undefined, {
+        month: 'short', day: 'numeric', year: 'numeric'
+      });
+    } catch (e) { return ''; }
+  }
+
+  // ---- Post picker -------------------------------------------------------
+  function loadPosts() {
+    els.loadingMsg.style.display = '';
+    fetch(PROXY_URL + '?action=list_posts')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.errors) throw new Error(data.errors[0].message || 'Ghost error');
+        allPosts = data.posts || [];
+        els.loadingMsg.style.display = 'none';
+      })
+      .catch(function (err) {
+        els.loadingMsg.textContent = 'Could not load posts: ' + err.message;
+        els.loadingMsg.style.color = 'var(--bad)';
+      });
+  }
+
+  function renderPostList(filter) {
+    var q = (filter || '').toLowerCase();
+    var matches = allPosts.filter(function (p) {
+      return !q || (p.title || '').toLowerCase().indexOf(q) !== -1;
+    }).slice(0, 30);
+
+    if (!matches.length) {
+      els.postList.innerHTML = '<div class="post-item" style="color:var(--ink-muted);cursor:default;">No matches</div>';
+      return;
+    }
+    els.postList.innerHTML = matches.map(function (p) {
+      return '<button type="button" class="post-item" data-id="' + escapeHtml(p.id) + '">' +
+             '  <div class="post-item-title">' + escapeHtml(p.title) + '</div>' +
+             '  <div class="post-item-meta">' + escapeHtml(fmtDate(p.published_at)) + ' · /' + escapeHtml(p.slug) + '</div>' +
+             '</button>';
+    }).join('');
+  }
+
+  els.postSearch.addEventListener('focus', function () {
+    if (!allPosts.length) loadPosts();
+    renderPostList(els.postSearch.value);
+    els.postList.classList.add('is-open');
+  });
+  els.postSearch.addEventListener('input', function () {
+    renderPostList(els.postSearch.value);
+    els.postList.classList.add('is-open');
+  });
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.post-picker')) {
+      els.postList.classList.remove('is-open');
+    }
+  });
+
+  els.postList.addEventListener('click', function (e) {
+    var item = e.target.closest('.post-item');
+    if (!item || !item.dataset.id) return;
+    selectPost(item.dataset.id);
+    els.postList.classList.remove('is-open');
+  });
+
+  // ---- Pick a post ------------------------------------------------------
+  function selectPost(id) {
+    var post = allPosts.find(function (p) { return p.id === id; });
+    if (!post) return;
+    els.postSearch.value = post.title;
+    els.selectedPost.classList.add('is-shown');
+    els.selectedPostTitle.textContent = post.title;
+    els.selectedPostMeta.textContent = 'Loading…';
+    els.selectedPostLink.href = post.url;
+    pendingDeletions.clear();
+
+    // Fetch full post including codeinjection_foot
+    fetch(PROXY_URL + '?action=get_post&id=' + encodeURIComponent(id))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.errors) throw new Error(data.errors[0].message || 'Ghost error');
+        selectedPost = data.posts[0];
+        els.selectedPostMeta.textContent = 'Last updated ' + fmtDate(selectedPost.updated_at);
+        existingUrls = parseExistingUrls(selectedPost.codeinjection_foot || '');
+        renderExisting();
+        renderNewStatus();
+        els.saveBtn.disabled = false;
+      })
+      .catch(function (err) {
+        els.selectedPostMeta.textContent = 'Error: ' + err.message;
+        els.saveBtn.disabled = true;
+      });
+  }
+
+  // ---- Parse existing #social-replies JSON from codeinjection_foot --------
+  function parseExistingUrls(footer) {
+    // Look for our specific script tag and extract the URLs.
+    var match = footer.match(/<script[^>]*id=["']social-replies["'][^>]*>([\s\S]*?)<\/script>/i);
+    if (!match) return [];
+    try {
+      var json = JSON.parse(match[1]);
+      return Array.isArray(json.replies) ? json.replies : [];
+    } catch (e) { return []; }
+  }
+
+  function renderExisting() {
+    if (!existingUrls.length) {
+      els.existingSection.style.display = 'none';
+      return;
+    }
+    els.existingSection.style.display = '';
+    var stagedCount = pendingDeletions.size;
+    var remaining = existingUrls.length - stagedCount;
+    els.existingCount.textContent = stagedCount > 0
+      ? remaining + ' / ' + existingUrls.length + ' (−' + stagedCount + ')'
+      : existingUrls.length;
+
+    els.existingList.innerHTML = existingUrls.map(function (url) {
+      var kind = classify(url);
+      var label = kind === 'invalid' ? 'unknown' : kind;
+      var staged = pendingDeletions.has(url);
+      var rowClass = staged ? 'removing' : 'existing';
+      var actionBtn = staged
+        ? '<button type="button" class="row-remove" data-action="undo" data-url="' + escapeHtml(url) + '" aria-label="Undo remove">Undo</button>'
+        : '<button type="button" class="row-remove" data-action="remove" data-url="' + escapeHtml(url) + '" aria-label="Remove this URL">×</button>';
+      return '<div class="status-row ' + rowClass + '">' +
+             '  <span class="status-badge" data-kind="' + (staged ? 'invalid' : 'existing') + '">' +
+                  (staged ? 'Removing' : 'Saved') + '</span>' +
+             '  <span class="status-badge" data-kind="' + kind + '">' + label + '</span>' +
+             '  <span class="status-url">' + escapeHtml(url) + '</span>' +
+             '  ' + actionBtn +
+             '</div>';
+    }).join('');
+  }
+
+  // Click handler for the per-row remove / undo buttons
+  els.existingList.addEventListener('click', function (e) {
+    var btn = e.target.closest('.row-remove');
+    if (!btn) return;
+    var url = btn.dataset.url;
+    if (!url) return;
+    if (btn.dataset.action === 'remove') {
+      pendingDeletions.add(url);
+    } else {
+      pendingDeletions.delete(url);
+    }
+    renderExisting();
+  });
+
+  // ---- New URLs textarea -------------------------------------------------
+  function parseInput() {
+    return els.urls.value
+      .split(/\r?\n/)
+      .map(function (s) { return s.trim(); })
+      .filter(Boolean);
+  }
+
+  function renderNewStatus() {
+    var raw = parseInput();
+    if (!raw.length) {
+      els.newStatusSection.style.display = 'none';
+      els.newCount.textContent = '0';
+      return;
+    }
+    els.newStatusSection.style.display = '';
+    var existingSet = new Set(existingUrls);
+    var classified = raw.map(function (url) {
+      return {
+        url: url,
+        kind: classify(url),
+        duplicate: existingSet.has(url)
+      };
+    });
+    var validNew = classified.filter(function (c) {
+      return c.kind !== 'invalid' && !c.duplicate;
+    }).length;
+    els.newCount.textContent = validNew + ' new / ' + classified.length;
+    els.newStatusList.innerHTML = classified.map(function (c) {
+      var label = c.duplicate ? 'duplicate' :
+                  c.kind === 'invalid' ? 'invalid' : c.kind;
+      var kindAttr = c.duplicate ? 'existing' : c.kind;
+      var rowClass = c.kind === 'invalid' ? ' invalid' :
+                     c.duplicate ? ' existing' : '';
+      return '<div class="status-row' + rowClass + '">' +
+             '  <span class="status-badge" data-kind="' + kindAttr + '">' + label + '</span>' +
+             '  <span class="status-url">' + escapeHtml(c.url) + '</span>' +
+             '</div>';
+    }).join('');
+  }
+
+  els.urls.addEventListener('input', renderNewStatus);
+
+  // ---- Save to Ghost -----------------------------------------------------
+  els.saveBtn.addEventListener('click', function () {
+    if (!selectedPost) return;
+
+    var raw = parseInput();
+    var newValid = raw.filter(function (url) {
+      return classify(url) !== 'invalid';
+    });
+
+    // Start with existing URLs minus anything the user marked for deletion
+    var combined = existingUrls.filter(function (url) {
+      return !pendingDeletions.has(url);
+    });
+    var combinedSet = new Set(combined);
+    newValid.forEach(function (url) {
+      if (!combinedSet.has(url)) {
+        combined.push(url);
+        combinedSet.add(url);
+      }
+    });
+
+    var added = combined.length - (existingUrls.length - pendingDeletions.size);
+    var removed = pendingDeletions.size;
+
+    if (added === 0 && removed === 0) {
+      toast('Nothing to save — no additions or removals', 'error');
+      return;
+    }
+
+    // Build the full footer content. Preserve any other content the user
+    // may have added to codeinjection_foot. If the combined list is empty
+    // (all replies deleted), remove our script block entirely rather than
+    // leaving an empty {"replies":[]} block.
+    var existingFooter = selectedPost.codeinjection_foot || '';
+    var srRegex = /\s*<script[^>]*id=["']social-replies["'][^>]*>[\s\S]*?<\/script>\s*/i;
+    var newFooter;
+    if (combined.length === 0) {
+      // Strip out our block; trim any whitespace artifacts left behind
+      newFooter = existingFooter.replace(srRegex, '').trim();
+    } else {
+      var ourBlock = '<script type="application/json" id="social-replies">\n' +
+                     JSON.stringify({ replies: combined }, null, 2) + '\n' +
+                     '<\/script>';
+      if (srRegex.test(existingFooter)) {
+        // Replace existing block in place (preserve surrounding whitespace
+        // by not consuming it in this regex variant)
+        newFooter = existingFooter.replace(
+          /<script[^>]*id=["']social-replies["'][^>]*>[\s\S]*?<\/script>/i,
+          ourBlock
+        );
+      } else {
+        newFooter = existingFooter ? existingFooter + '\n\n' + ourBlock : ourBlock;
+      }
+    }
+
+    els.saveBtn.disabled = true;
+    els.saveBtn.textContent = 'Saving…';
+
+    fetch(PROXY_URL + '?action=update_post&id=' + encodeURIComponent(selectedPost.id), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        codeinjection_foot: newFooter,
+        updated_at: selectedPost.updated_at
+      })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.errors) throw new Error(data.errors[0].message || 'Ghost error');
+        var summary = [];
+        if (added > 0) summary.push(added + ' added');
+        if (removed > 0) summary.push(removed + ' removed');
+        toast('✓ Saved — ' + summary.join(', '), 'success');
+        // Refresh selected post state so updated_at is current
+        existingUrls = combined;
+        pendingDeletions.clear();
+        if (data.posts && data.posts[0]) {
+          selectedPost = data.posts[0];
+        }
+        els.urls.value = '';
+        renderExisting();
+        renderNewStatus();
+      })
+      .catch(function (err) {
+        toast('Save failed: ' + err.message, 'error');
+      })
+      .finally(function () {
+        els.saveBtn.disabled = false;
+        els.saveBtn.textContent = 'Save to Ghost';
+      });
+  });
+
+  els.clearBtn.addEventListener('click', function () {
+    els.urls.value = '';
+    renderNewStatus();
+  });
+
+  // Kick off post loading immediately so the first focus is fast
+  loadPosts();
+})();
+</script>
+</body>
+</html>

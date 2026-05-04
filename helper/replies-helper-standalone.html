@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ghost Social Replies — Standalone Helper</title>
+<style>
+  :root {
+    --paper: #f6f1e8;
+    --paper-dim: #ede7da;
+    --page-bg: #fdfbf6;
+    --ink: #1a1512;
+    --ink-soft: #463e36;
+    --ink-muted: #78706a;
+    --rule: #d9d1c0;
+    --accent: #b4421a;
+    --bad: #a03225;
+    --good: #2e7a4e;
+    --mastodon: #5655c4;
+    --bluesky: #0085ff;
+    --font-serif: 'Fraunces', Georgia, serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--page-bg); color: var(--ink); font-family: var(--font-sans); }
+  body {
+    min-height: 100vh;
+    padding: 2.5rem 1.5rem 4rem;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    font-size: clamp(1.8rem, 4vw, 2.4rem);
+    letter-spacing: -0.02em;
+    margin-bottom: 0.5rem;
+  }
+  h1 em { color: var(--accent); font-weight: 300; }
+  .subtitle {
+    color: var(--ink-muted);
+    font-size: 0.95rem;
+    margin-bottom: 1.5rem;
+    line-height: 1.45;
+  }
+  label, .field-label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 0.5rem;
+  }
+  textarea, input[type=search], input[type=text], input[type=password], select {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: var(--ink);
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input[type=search], select { font-family: var(--font-sans); }
+  textarea { min-height: 130px; resize: vertical; }
+  textarea:focus, input:focus, select:focus { border-color: var(--accent); }
+  textarea[readonly] { background: var(--paper-dim); font-size: 0.78rem; min-height: 90px; }
+  .help { color: var(--ink-muted); font-size: 0.82rem; margin-top: 0.5rem; line-height: 1.5; }
+  .section { margin-bottom: 1.75rem; }
+  .section-head {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  .count {
+    display: inline-block;
+    margin-left: auto;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: var(--paper-dim);
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+  }
+
+  /* Mode toggle */
+  .mode-toggle {
+    display: inline-flex;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 3px;
+    margin-bottom: 2rem;
+  }
+  .mode-toggle button {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .mode-toggle button.is-active {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  /* Output script block */
+  .output-block {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.55;
+    color: var(--ink);
+    background: var(--paper-dim);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    min-height: 120px;
+    resize: vertical;
+    white-space: pre;
+    overflow: auto;
+  }
+
+  .post-picker { position: relative; }
+  .post-list {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 0.25rem;
+    max-height: 260px;
+    overflow-y: auto;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    z-index: 10;
+    box-shadow: 0 6px 20px -10px rgba(26,21,18,0.3);
+  }
+  .post-list.is-open { display: block; }
+  .post-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--rule);
+    padding: 0.65rem 0.85rem;
+    cursor: pointer;
+    color: var(--ink);
+    font-family: var(--font-sans);
+  }
+  .post-item:hover, .post-item.is-active {
+    background: var(--paper-dim);
+    color: var(--accent);
+  }
+  .post-item:last-child { border-bottom: none; }
+  .post-item-title { font-size: 0.88rem; font-weight: 500; }
+  .post-item-meta { font-size: 0.73rem; color: var(--ink-muted); margin-top: 0.15rem; }
+  .selected-post {
+    padding: 0.85rem 1rem;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    display: none;
+  }
+  .selected-post.is-shown { display: block; }
+  .selected-post-title { font-weight: 600; font-size: 0.95rem; color: var(--ink); }
+  .selected-post-meta { font-size: 0.78rem; color: var(--ink-muted); margin-top: 0.2rem; font-family: var(--font-mono); }
+  .selected-post-link {
+    margin-top: 0.5rem;
+    font-size: 0.78rem;
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .selected-post-link:hover { text-decoration: underline; }
+
+  .status-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin: 1rem 0 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+  }
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.45rem 0.7rem;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    word-break: break-all;
+    line-height: 1.35;
+  }
+  .status-row.invalid { color: var(--bad); background: #a032251a; border-color: #a0322540; }
+  .status-row.existing { background: #2e7a4e10; border-color: #2e7a4e30; }
+  .status-row.removing { background: #a032251a; border-color: #a0322540; }
+  .status-row.removing .status-url {
+    text-decoration: line-through;
+    color: var(--bad);
+    opacity: 0.7;
+  }
+  .row-remove {
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    color: var(--ink-muted);
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s, color 0.15s;
+  }
+  .row-remove:hover { background: var(--bad); color: var(--paper); }
+  .row-remove[data-action="undo"] {
+    width: auto;
+    padding: 0 0.65rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    height: 24px;
+    color: var(--bad);
+  }
+  .row-remove[data-action="undo"]:hover {
+    background: var(--paper-dim);
+    color: var(--ink);
+  }
+  .status-badge {
+    flex-shrink: 0;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    min-width: 78px;
+    text-align: center;
+  }
+  .status-badge[data-kind="mastodon"] { background: #6364ff1a; color: var(--mastodon); }
+  .status-badge[data-kind="bluesky"]  { background: #0085ff1a; color: var(--bluesky); }
+  .status-badge[data-kind="invalid"]  { background: #a032251a; color: var(--bad); }
+  .status-badge[data-kind="existing"] { background: #2e7a4e1a; color: var(--good); }
+  .status-url { flex: 1; min-width: 0; }
+  .actions {
+    display: flex;
+    gap: 0.65rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+  button.btn {
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 0.75rem 1.4rem;
+    border: 1px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s, opacity 0.15s;
+  }
+  button.btn:hover { background: var(--accent); border-color: var(--accent); }
+  button.btn:active { transform: scale(0.98); }
+  button.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.btn.secondary {
+    background: transparent;
+    color: var(--ink);
+  }
+  button.btn.secondary:hover {
+    background: var(--paper-dim);
+    color: var(--ink);
+    border-color: var(--ink);
+  }
+  button.btn.success { background: var(--good); border-color: var(--good); }
+  button.btn.error   { background: var(--bad);  border-color: var(--bad); }
+
+  .toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.85rem 1.5rem;
+    border-radius: 999px;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    font-weight: 500;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .toast.is-shown { opacity: 1; }
+  .toast.success { background: var(--good); }
+  .toast.error   { background: var(--bad); }
+
+  details {
+    margin-top: 2rem;
+    padding: 1rem 1.2rem;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+  }
+  details summary {
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    user-select: none;
+    color: var(--ink-soft);
+  }
+  details summary:hover { color: var(--accent); }
+  details p { margin: 0.75rem 0; font-size: 0.88rem; line-height: 1.6; color: var(--ink-soft); }
+  details ol, details ul { margin: 0.5rem 0 0.5rem 1.4rem; }
+  details li { font-size: 0.88rem; line-height: 1.6; color: var(--ink-soft); margin-bottom: 0.25rem; }
+  details code {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    padding: 0.1rem 0.35rem;
+    background: var(--paper-dim);
+    border-radius: 2px;
+  }
+
+  .panel {
+    padding: 1.25rem;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+  }
+  .panel-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+  .panel-row > * { flex: 1; min-width: 220px; }
+  .field { margin-bottom: 1rem; }
+  .field:last-child { margin-bottom: 0; }
+
+  .warning-banner {
+    padding: 0.85rem 1rem;
+    background: #b4421a14;
+    border: 1px solid #b4421a40;
+    border-radius: 4px;
+    color: var(--ink);
+    font-size: 0.82rem;
+    line-height: 1.55;
+    margin-bottom: 1.25rem;
+  }
+  .warning-banner strong { color: var(--accent); }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Social Replies <em>Helper</em> · Standalone</h1>
+  <p class="subtitle">
+    A single HTML file — no server required. Default mode builds the
+    Code-Injection script block from URLs you paste; copy it into Ghost yourself.
+    Optional direct mode talks to Ghost's Admin API straight from your browser.
+  </p>
+
+  <div class="mode-toggle" role="tablist" aria-label="Mode">
+    <button id="modeOffline" class="is-active" role="tab" aria-selected="true">Offline (copy/paste)</button>
+    <button id="modeDirect" role="tab" aria-selected="false">Direct to Ghost</button>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- OFFLINE MODE                                                 -->
+  <!-- ============================================================ -->
+  <div id="offlinePane">
+
+    <!-- Optional: paste current footer to merge -->
+    <div class="section">
+      <div class="section-head">
+        <label for="existingFooter">Current footer (optional)</label>
+        <span class="count" id="existingFooterCount">0 saved</span>
+      </div>
+      <textarea id="existingFooter" placeholder='Paste the existing &lt;script id="social-replies"&gt;...&lt;/script&gt; block here to merge with new URLs (or leave blank to start fresh).' spellcheck="false"></textarea>
+      <div class="help">Optional. If you already have URLs saved on this post, copy the existing script block from Ghost's Code Injection footer and paste it here so we can merge instead of overwriting.</div>
+    </div>
+
+    <!-- New URLs -->
+    <div class="section">
+      <div class="section-head">
+        <label for="urlsOffline">Reply URLs</label>
+        <span class="count" id="newCountOffline">0</span>
+      </div>
+      <textarea id="urlsOffline" placeholder="https://mastodon.social/@matt/123&#10;https://bsky.app/profile/matt.bsky.social/post/abc" autocomplete="off" spellcheck="false"></textarea>
+      <div class="help">One URL per line. Mastodon and Bluesky post URLs. Duplicates and invalid URLs are flagged below.</div>
+    </div>
+
+    <!-- Detected -->
+    <div class="section hidden" id="newStatusSectionOffline">
+      <label>Detected</label>
+      <div class="status-list" id="newStatusListOffline"></div>
+    </div>
+
+    <!-- Output -->
+    <div class="section">
+      <div class="section-head">
+        <label for="outputBlock">Paste this into Ghost</label>
+        <span class="count" id="combinedCount">0 URLs</span>
+      </div>
+      <textarea id="outputBlock" class="output-block" readonly spellcheck="false"></textarea>
+      <div class="help">In Ghost admin, open the post → gear icon → <strong>Code injection</strong> → <strong>Post footer</strong>, then paste the block above (replacing any existing one) and save.</div>
+    </div>
+
+    <div class="actions">
+      <button id="copyBtn" type="button" class="btn">Copy block</button>
+      <button id="clearOfflineBtn" type="button" class="btn secondary">Clear</button>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- DIRECT MODE                                                  -->
+  <!-- ============================================================ -->
+  <div id="directPane" class="hidden">
+
+    <div class="warning-banner" id="directWarning">
+      <strong>Heads up:</strong> Direct mode talks to Ghost's Admin API from your browser.
+      Your Admin API key is stored in this browser's localStorage — anyone with access
+      to this device can read it. Ghost may also block these requests with a CORS error;
+      if so, fall back to Offline mode.
+    </div>
+
+    <!-- Settings -->
+    <div class="panel" id="settingsPanel">
+      <div class="field">
+        <label for="ghostUrl">Ghost Admin URL</label>
+        <input type="text" id="ghostUrl" placeholder="https://yourblog.ghost.io" autocomplete="off" spellcheck="false">
+        <div class="help">For Ghost(Pro) this is the <code>*.ghost.io</code> URL, NOT your custom domain. For self-hosted Ghost, it's your site URL.</div>
+      </div>
+      <div class="field">
+        <label for="ghostKey">Admin API key</label>
+        <input type="password" id="ghostKey" placeholder="ID:SECRET (from Ghost → Integrations)" autocomplete="off" spellcheck="false">
+        <div class="help">Format: <code>id:secret</code>. Create one at Ghost admin → Settings → Integrations → Add custom integration.</div>
+      </div>
+      <div class="actions" style="margin-top: 0;">
+        <button id="connectBtn" type="button" class="btn">Connect</button>
+        <button id="forgetBtn" type="button" class="btn secondary">Forget saved key</button>
+      </div>
+    </div>
+
+    <!-- Connected UI (hidden until connection succeeds) -->
+    <div id="connectedUI" class="hidden">
+      <!-- Pick a post -->
+      <div class="section post-picker">
+        <label for="postSearch">Pick a post</label>
+        <input type="search" id="postSearch" placeholder="Type to search recent posts..." autocomplete="off">
+        <div class="post-list" id="postList"></div>
+        <div class="help" id="loadingMsg" style="display:none;">Loading recent posts from Ghost…</div>
+      </div>
+
+      <div class="section">
+        <div class="selected-post" id="selectedPost">
+          <div class="selected-post-title" id="selectedPostTitle"></div>
+          <div class="selected-post-meta" id="selectedPostMeta"></div>
+          <a class="selected-post-link" id="selectedPostLink" target="_blank" rel="noopener">View live post →</a>
+        </div>
+      </div>
+
+      <!-- Existing replies -->
+      <div class="section hidden" id="existingSection">
+        <div class="section-head">
+          <label>Currently on this post</label>
+          <span class="count" id="existingCount">0</span>
+        </div>
+        <div class="status-list" id="existingList"></div>
+      </div>
+
+      <!-- New URLs -->
+      <div class="section">
+        <div class="section-head">
+          <label for="urlsDirect">Reply URLs (paste new ones here)</label>
+          <span class="count" id="newCountDirect">0</span>
+        </div>
+        <textarea id="urlsDirect" placeholder="https://mastodon.social/@matt/123&#10;https://bsky.app/profile/matt.bsky.social/post/abc" autocomplete="off" spellcheck="false"></textarea>
+        <div class="help">One URL per line. URLs already saved on this post will be detected and merged automatically.</div>
+      </div>
+
+      <div class="section hidden" id="newStatusSectionDirect">
+        <label>Detected</label>
+        <div class="status-list" id="newStatusListDirect"></div>
+      </div>
+
+      <div class="actions">
+        <button id="saveBtn" type="button" class="btn" disabled>Save to Ghost</button>
+        <button id="clearDirectBtn" type="button" class="btn secondary">Clear new URLs</button>
+      </div>
+    </div>
+  </div>
+
+  <details>
+    <summary>How this works</summary>
+    <p><strong>Offline mode</strong> never talks to Ghost. It just builds the
+    properly-formatted <code>&lt;script type="application/json" id="social-replies"&gt;...&lt;/script&gt;</code>
+    block from your URL list. You then paste it into Ghost admin yourself
+    (post → gear icon → Code injection → Post footer). To preserve URLs already
+    on a post, paste the current script block into the "Current footer" field
+    first — the helper merges and de-duplicates.</p>
+    <p><strong>Direct mode</strong> generates a short-lived JWT in your browser
+    (HS256, 5-minute expiration, audience <code>/admin/</code>) using the Web
+    Crypto API, then calls Ghost's Admin API directly. No PHP proxy needed.
+    Two caveats:</p>
+    <ol>
+      <li>Your Admin API key is stored in <code>localStorage</code> after you
+      click Connect. Anyone with access to this browser can read it. Use
+      "Forget saved key" when you're done if you're worried.</li>
+      <li>Ghost may reject browser-origin requests with a CORS error. If that
+      happens, fall back to Offline mode — it always works.</li>
+    </ol>
+  </details>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  // ====================================================================
+  //  SHARED HELPERS
+  // ====================================================================
+
+  const els = {
+    // mode
+    modeOffline: document.getElementById('modeOffline'),
+    modeDirect:  document.getElementById('modeDirect'),
+    offlinePane: document.getElementById('offlinePane'),
+    directPane:  document.getElementById('directPane'),
+    toast:       document.getElementById('toast'),
+
+    // offline
+    existingFooter:        document.getElementById('existingFooter'),
+    existingFooterCount:   document.getElementById('existingFooterCount'),
+    urlsOffline:           document.getElementById('urlsOffline'),
+    newCountOffline:       document.getElementById('newCountOffline'),
+    newStatusSectionOffline: document.getElementById('newStatusSectionOffline'),
+    newStatusListOffline:  document.getElementById('newStatusListOffline'),
+    outputBlock:           document.getElementById('outputBlock'),
+    combinedCount:         document.getElementById('combinedCount'),
+    copyBtn:               document.getElementById('copyBtn'),
+    clearOfflineBtn:       document.getElementById('clearOfflineBtn'),
+
+    // direct - settings
+    ghostUrl:    document.getElementById('ghostUrl'),
+    ghostKey:    document.getElementById('ghostKey'),
+    connectBtn:  document.getElementById('connectBtn'),
+    forgetBtn:   document.getElementById('forgetBtn'),
+    settingsPanel: document.getElementById('settingsPanel'),
+    connectedUI: document.getElementById('connectedUI'),
+
+    // direct - workflow
+    postSearch:        document.getElementById('postSearch'),
+    postList:          document.getElementById('postList'),
+    loadingMsg:        document.getElementById('loadingMsg'),
+    selectedPost:      document.getElementById('selectedPost'),
+    selectedPostTitle: document.getElementById('selectedPostTitle'),
+    selectedPostMeta:  document.getElementById('selectedPostMeta'),
+    selectedPostLink:  document.getElementById('selectedPostLink'),
+    existingSection:   document.getElementById('existingSection'),
+    existingList:      document.getElementById('existingList'),
+    existingCount:     document.getElementById('existingCount'),
+    urlsDirect:        document.getElementById('urlsDirect'),
+    newCountDirect:    document.getElementById('newCountDirect'),
+    newStatusSectionDirect: document.getElementById('newStatusSectionDirect'),
+    newStatusListDirect:    document.getElementById('newStatusListDirect'),
+    saveBtn:           document.getElementById('saveBtn'),
+    clearDirectBtn:    document.getElementById('clearDirectBtn'),
+  };
+
+  // ---- Toast ----------------------------------------------------------
+  let toastTimer;
+  function toast(msg, kind) {
+    clearTimeout(toastTimer);
+    els.toast.textContent = msg;
+    els.toast.className = 'toast is-shown ' + (kind || '');
+    toastTimer = setTimeout(() => els.toast.classList.remove('is-shown'), 3500);
+  }
+
+  // ---- URL classification --------------------------------------------
+  function classify(url) {
+    try {
+      const u = new URL(url);
+      if (u.host === 'bsky.app' || u.host.endsWith('.bsky.app')) {
+        if (/^\/profile\/[^/]+\/post\/[^/]+/.test(u.pathname)) return 'bluesky';
+        return 'invalid';
+      }
+      if (/^\/(@[^/]+|users\/[^/]+\/statuses)\/\d+/.test(u.pathname)) return 'mastodon';
+      return 'invalid';
+    } catch (e) { return 'invalid'; }
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => (
+      { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]
+    ));
+  }
+
+  function fmtDate(iso) {
+    try {
+      return new Date(iso).toLocaleDateString(undefined, {
+        month: 'short', day: 'numeric', year: 'numeric'
+      });
+    } catch (e) { return ''; }
+  }
+
+  function parseLines(text) {
+    return (text || '')
+      .split(/\r?\n/)
+      .map(s => s.trim())
+      .filter(Boolean);
+  }
+
+  // Extract URLs from an existing #social-replies <script> block (or a bare JSON object)
+  function parseExistingUrls(footer) {
+    if (!footer) return [];
+    const match = footer.match(/<script[^>]*id=["']social-replies["'][^>]*>([\s\S]*?)<\/script>/i);
+    const raw = match ? match[1] : footer;
+    try {
+      const json = JSON.parse(raw);
+      return Array.isArray(json.replies) ? json.replies.filter(u => typeof u === 'string') : [];
+    } catch (e) { return []; }
+  }
+
+  // Build the canonical script block
+  function buildBlock(urls) {
+    return '<script type="application/json" id="social-replies">\n' +
+           JSON.stringify({ replies: urls }, null, 2) + '\n' +
+           '<\/script>';
+  }
+
+  // Render a status list given an array of {url, kind, duplicate}
+  function renderStatusList(target, items) {
+    target.innerHTML = items.map(c => {
+      const label = c.duplicate ? 'duplicate' :
+                    c.kind === 'invalid' ? 'invalid' : c.kind;
+      const kindAttr = c.duplicate ? 'existing' : c.kind;
+      const rowClass = c.kind === 'invalid' ? ' invalid' :
+                       c.duplicate ? ' existing' : '';
+      return '<div class="status-row' + rowClass + '">' +
+             '  <span class="status-badge" data-kind="' + kindAttr + '">' + label + '</span>' +
+             '  <span class="status-url">' + escapeHtml(c.url) + '</span>' +
+             '</div>';
+    }).join('');
+  }
+
+  // ====================================================================
+  //  MODE TOGGLE
+  // ====================================================================
+  function setMode(mode) {
+    const offline = mode === 'offline';
+    els.modeOffline.classList.toggle('is-active', offline);
+    els.modeDirect.classList.toggle('is-active', !offline);
+    els.modeOffline.setAttribute('aria-selected', offline ? 'true' : 'false');
+    els.modeDirect.setAttribute('aria-selected', offline ? 'false' : 'true');
+    els.offlinePane.classList.toggle('hidden', !offline);
+    els.directPane.classList.toggle('hidden', offline);
+    try { localStorage.setItem('grsh.mode', mode); } catch (e) {}
+  }
+  els.modeOffline.addEventListener('click', () => setMode('offline'));
+  els.modeDirect.addEventListener('click', () => setMode('direct'));
+
+  // Restore last mode
+  try {
+    const saved = localStorage.getItem('grsh.mode');
+    if (saved === 'direct') setMode('direct');
+  } catch (e) {}
+
+  // ====================================================================
+  //  OFFLINE MODE
+  // ====================================================================
+  function refreshOffline() {
+    const existing = parseExistingUrls(els.existingFooter.value);
+    const existingSet = new Set(existing);
+    els.existingFooterCount.textContent =
+      existing.length + ' saved' + (existing.length === 1 ? '' : '');
+
+    const raw = parseLines(els.urlsOffline.value);
+    const classified = raw.map(url => ({
+      url,
+      kind: classify(url),
+      duplicate: existingSet.has(url),
+    }));
+    const validNew = classified.filter(c => c.kind !== 'invalid' && !c.duplicate);
+    els.newCountOffline.textContent =
+      validNew.length + ' new / ' + classified.length;
+
+    if (classified.length) {
+      els.newStatusSectionOffline.classList.remove('hidden');
+      renderStatusList(els.newStatusListOffline, classified);
+    } else {
+      els.newStatusSectionOffline.classList.add('hidden');
+    }
+
+    // Combine existing + valid-new (deduped, preserving order)
+    const combined = existing.slice();
+    const combinedSet = new Set(existing);
+    validNew.forEach(c => {
+      if (!combinedSet.has(c.url)) {
+        combined.push(c.url);
+        combinedSet.add(c.url);
+      }
+    });
+
+    els.combinedCount.textContent =
+      combined.length + ' URL' + (combined.length === 1 ? '' : 's');
+    els.outputBlock.value = combined.length ? buildBlock(combined) : '';
+  }
+
+  els.existingFooter.addEventListener('input', refreshOffline);
+  els.urlsOffline.addEventListener('input', refreshOffline);
+
+  els.copyBtn.addEventListener('click', async () => {
+    const text = els.outputBlock.value;
+    if (!text) {
+      toast('Nothing to copy yet — add some URLs', 'error');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('✓ Copied — paste into Ghost Code Injection footer', 'success');
+    } catch (e) {
+      // Fallback: select the textarea so user can Cmd/Ctrl-C
+      els.outputBlock.focus();
+      els.outputBlock.select();
+      toast('Selected — press ⌘/Ctrl-C to copy', 'success');
+    }
+  });
+
+  els.clearOfflineBtn.addEventListener('click', () => {
+    els.existingFooter.value = '';
+    els.urlsOffline.value = '';
+    refreshOffline();
+  });
+
+  refreshOffline();
+
+  // ====================================================================
+  //  DIRECT MODE — JWT + Ghost Admin API
+  // ====================================================================
+
+  function hexToBytes(hex) {
+    const clean = String(hex || '').trim();
+    if (!/^[0-9a-fA-F]*$/.test(clean) || clean.length % 2 !== 0) {
+      throw new Error('Admin API secret is not valid hex');
+    }
+    const out = new Uint8Array(clean.length / 2);
+    for (let i = 0; i < clean.length; i += 2) {
+      out[i / 2] = parseInt(clean.substr(i, 2), 16);
+    }
+    return out;
+  }
+
+  function b64urlFromBytes(bytes) {
+    let s = '';
+    for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function b64urlFromString(str) {
+    return b64urlFromBytes(new TextEncoder().encode(str));
+  }
+
+  async function ghostJwt(adminKey) {
+    const idx = adminKey.indexOf(':');
+    if (idx < 0) throw new Error('Admin API key must be in the form ID:SECRET');
+    const id = adminKey.slice(0, idx);
+    const secret = adminKey.slice(idx + 1);
+    const secretBin = hexToBytes(secret);
+
+    const header = { alg: 'HS256', typ: 'JWT', kid: id };
+    const now = Math.floor(Date.now() / 1000);
+    const payload = { iat: now, exp: now + 5 * 60, aud: '/admin/' };
+
+    const headerEnc  = b64urlFromString(JSON.stringify(header));
+    const payloadEnc = b64urlFromString(JSON.stringify(payload));
+    const signingInput = headerEnc + '.' + payloadEnc;
+
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw', secretBin, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+    );
+    const sigBuf = await crypto.subtle.sign(
+      'HMAC', cryptoKey, new TextEncoder().encode(signingInput)
+    );
+    return signingInput + '.' + b64urlFromBytes(new Uint8Array(sigBuf));
+  }
+
+  async function ghostFetch(path, opts) {
+    const url = (state.ghostUrl || '').replace(/\/+$/, '') + '/ghost/api/admin' + path;
+    const token = await ghostJwt(state.ghostKey);
+    const init = Object.assign({}, opts || {});
+    init.headers = Object.assign({}, init.headers || {}, {
+      'Authorization': 'Ghost ' + token,
+      'Accept-Version': 'v6.0',
+      'Content-Type': 'application/json',
+    });
+    let resp;
+    try {
+      resp = await fetch(url, init);
+    } catch (netErr) {
+      // TypeError from fetch typically = CORS or network failure
+      throw new Error(
+        'Network/CORS error reaching Ghost. The browser may be blocking the request. ' +
+        'Try Offline mode, or run this file from a local server / disable CORS for testing.'
+      );
+    }
+    let data;
+    try { data = await resp.json(); }
+    catch (e) {
+      throw new Error('Ghost returned a non-JSON response (HTTP ' + resp.status + ')');
+    }
+    if (!resp.ok || (data && data.errors)) {
+      const msg = (data && data.errors && data.errors[0] && data.errors[0].message)
+        || ('HTTP ' + resp.status);
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  // ---- State ----------------------------------------------------------
+  const state = {
+    ghostUrl: '',
+    ghostKey: '',
+    allPosts: [],
+    selectedPost: null,        // { id, title, slug, url, codeinjection_foot, updated_at }
+    existingUrls: [],
+    pendingDeletions: new Set(),
+  };
+
+  function loadSavedCreds() {
+    try {
+      state.ghostUrl = localStorage.getItem('grsh.url') || '';
+      state.ghostKey = localStorage.getItem('grsh.key') || '';
+    } catch (e) {}
+    els.ghostUrl.value = state.ghostUrl;
+    els.ghostKey.value = state.ghostKey;
+  }
+  function saveCreds() {
+    try {
+      localStorage.setItem('grsh.url', state.ghostUrl);
+      localStorage.setItem('grsh.key', state.ghostKey);
+    } catch (e) {}
+  }
+  function forgetCreds() {
+    try {
+      localStorage.removeItem('grsh.url');
+      localStorage.removeItem('grsh.key');
+    } catch (e) {}
+    state.ghostUrl = '';
+    state.ghostKey = '';
+    els.ghostUrl.value = '';
+    els.ghostKey.value = '';
+  }
+  loadSavedCreds();
+
+  // ---- Connect --------------------------------------------------------
+  els.connectBtn.addEventListener('click', async () => {
+    state.ghostUrl = (els.ghostUrl.value || '').trim();
+    state.ghostKey = (els.ghostKey.value || '').trim();
+    if (!state.ghostUrl || !state.ghostKey) {
+      toast('Need both Ghost URL and Admin API key', 'error');
+      return;
+    }
+    els.connectBtn.disabled = true;
+    els.connectBtn.textContent = 'Connecting…';
+    try {
+      // Smoke-test by fetching the first page of posts
+      await loadPosts();
+      saveCreds();
+      els.connectedUI.classList.remove('hidden');
+      toast('✓ Connected to Ghost', 'success');
+    } catch (err) {
+      toast('Connect failed: ' + err.message, 'error');
+    } finally {
+      els.connectBtn.disabled = false;
+      els.connectBtn.textContent = 'Connect';
+    }
+  });
+
+  els.forgetBtn.addEventListener('click', () => {
+    forgetCreds();
+    state.allPosts = [];
+    state.selectedPost = null;
+    els.connectedUI.classList.add('hidden');
+    toast('Saved key forgotten', 'success');
+  });
+
+  // ---- Posts list -----------------------------------------------------
+  async function loadPosts() {
+    els.loadingMsg.style.display = '';
+    els.loadingMsg.style.color = '';
+    els.loadingMsg.textContent = 'Loading recent posts from Ghost…';
+    try {
+      const params = new URLSearchParams({
+        limit: '100',
+        fields: 'id,title,slug,published_at,url',
+        order: 'published_at desc',
+        filter: 'status:published',
+      });
+      const data = await ghostFetch('/posts/?' + params.toString());
+      state.allPosts = data.posts || [];
+      els.loadingMsg.style.display = 'none';
+    } catch (err) {
+      els.loadingMsg.textContent = 'Could not load posts: ' + err.message;
+      els.loadingMsg.style.color = 'var(--bad)';
+      throw err;
+    }
+  }
+
+  function renderPostList(filter) {
+    const q = (filter || '').toLowerCase();
+    const matches = state.allPosts.filter(p =>
+      !q || (p.title || '').toLowerCase().indexOf(q) !== -1
+    ).slice(0, 30);
+    if (!matches.length) {
+      els.postList.innerHTML =
+        '<div class="post-item" style="color:var(--ink-muted);cursor:default;">No matches</div>';
+      return;
+    }
+    els.postList.innerHTML = matches.map(p =>
+      '<button type="button" class="post-item" data-id="' + escapeHtml(p.id) + '">' +
+      '  <div class="post-item-title">' + escapeHtml(p.title) + '</div>' +
+      '  <div class="post-item-meta">' + escapeHtml(fmtDate(p.published_at)) + ' · /' + escapeHtml(p.slug) + '</div>' +
+      '</button>'
+    ).join('');
+  }
+
+  els.postSearch.addEventListener('focus', () => {
+    if (!state.allPosts.length) loadPosts().catch(() => {});
+    renderPostList(els.postSearch.value);
+    els.postList.classList.add('is-open');
+  });
+  els.postSearch.addEventListener('input', () => {
+    renderPostList(els.postSearch.value);
+    els.postList.classList.add('is-open');
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.post-picker')) {
+      els.postList.classList.remove('is-open');
+    }
+  });
+  els.postList.addEventListener('click', e => {
+    const item = e.target.closest('.post-item');
+    if (!item || !item.dataset.id) return;
+    selectPost(item.dataset.id);
+    els.postList.classList.remove('is-open');
+  });
+
+  // ---- Pick a post ----------------------------------------------------
+  async function selectPost(id) {
+    const post = state.allPosts.find(p => p.id === id);
+    if (!post) return;
+    els.postSearch.value = post.title;
+    els.selectedPost.classList.add('is-shown');
+    els.selectedPostTitle.textContent = post.title;
+    els.selectedPostMeta.textContent = 'Loading…';
+    els.selectedPostLink.href = post.url;
+    state.pendingDeletions.clear();
+
+    try {
+      const params = new URLSearchParams({
+        fields: 'id,title,slug,url,codeinjection_foot,updated_at',
+      });
+      const data = await ghostFetch(
+        '/posts/' + encodeURIComponent(id) + '/?' + params.toString()
+      );
+      state.selectedPost = data.posts[0];
+      els.selectedPostMeta.textContent =
+        'Last updated ' + fmtDate(state.selectedPost.updated_at);
+      state.existingUrls = parseExistingUrls(state.selectedPost.codeinjection_foot || '');
+      renderExisting();
+      renderNewDirect();
+      els.saveBtn.disabled = false;
+    } catch (err) {
+      els.selectedPostMeta.textContent = 'Error: ' + err.message;
+      els.saveBtn.disabled = true;
+    }
+  }
+
+  function renderExisting() {
+    if (!state.existingUrls.length) {
+      els.existingSection.classList.add('hidden');
+      return;
+    }
+    els.existingSection.classList.remove('hidden');
+    const stagedCount = state.pendingDeletions.size;
+    const remaining = state.existingUrls.length - stagedCount;
+    els.existingCount.textContent = stagedCount > 0
+      ? remaining + ' / ' + state.existingUrls.length + ' (−' + stagedCount + ')'
+      : state.existingUrls.length;
+
+    els.existingList.innerHTML = state.existingUrls.map(url => {
+      const kind = classify(url);
+      const label = kind === 'invalid' ? 'unknown' : kind;
+      const staged = state.pendingDeletions.has(url);
+      const rowClass = staged ? 'removing' : 'existing';
+      const actionBtn = staged
+        ? '<button type="button" class="row-remove" data-action="undo" data-url="' + escapeHtml(url) + '" aria-label="Undo remove">Undo</button>'
+        : '<button type="button" class="row-remove" data-action="remove" data-url="' + escapeHtml(url) + '" aria-label="Remove this URL">×</button>';
+      return '<div class="status-row ' + rowClass + '">' +
+             '  <span class="status-badge" data-kind="' + (staged ? 'invalid' : 'existing') + '">' +
+                  (staged ? 'Removing' : 'Saved') + '</span>' +
+             '  <span class="status-badge" data-kind="' + kind + '">' + label + '</span>' +
+             '  <span class="status-url">' + escapeHtml(url) + '</span>' +
+             '  ' + actionBtn +
+             '</div>';
+    }).join('');
+  }
+
+  els.existingList.addEventListener('click', e => {
+    const btn = e.target.closest('.row-remove');
+    if (!btn) return;
+    const url = btn.dataset.url;
+    if (!url) return;
+    if (btn.dataset.action === 'remove') state.pendingDeletions.add(url);
+    else state.pendingDeletions.delete(url);
+    renderExisting();
+  });
+
+  function renderNewDirect() {
+    const raw = parseLines(els.urlsDirect.value);
+    if (!raw.length) {
+      els.newStatusSectionDirect.classList.add('hidden');
+      els.newCountDirect.textContent = '0';
+      return;
+    }
+    els.newStatusSectionDirect.classList.remove('hidden');
+    const existingSet = new Set(state.existingUrls);
+    const classified = raw.map(url => ({
+      url,
+      kind: classify(url),
+      duplicate: existingSet.has(url),
+    }));
+    const validNew = classified.filter(c => c.kind !== 'invalid' && !c.duplicate).length;
+    els.newCountDirect.textContent = validNew + ' new / ' + classified.length;
+    renderStatusList(els.newStatusListDirect, classified);
+  }
+
+  els.urlsDirect.addEventListener('input', renderNewDirect);
+
+  // ---- Save -----------------------------------------------------------
+  els.saveBtn.addEventListener('click', async () => {
+    if (!state.selectedPost) return;
+
+    const raw = parseLines(els.urlsDirect.value);
+    const newValid = raw.filter(url => classify(url) !== 'invalid');
+
+    // Existing minus user's pending deletions, then add new (deduped)
+    const combined = state.existingUrls.filter(u => !state.pendingDeletions.has(u));
+    const combinedSet = new Set(combined);
+    newValid.forEach(url => {
+      if (!combinedSet.has(url)) {
+        combined.push(url);
+        combinedSet.add(url);
+      }
+    });
+
+    const added   = combined.length - (state.existingUrls.length - state.pendingDeletions.size);
+    const removed = state.pendingDeletions.size;
+    if (added === 0 && removed === 0) {
+      toast('Nothing to save — no additions or removals', 'error');
+      return;
+    }
+
+    // Splice our block into existing footer, preserving any other content
+    const existingFooter = state.selectedPost.codeinjection_foot || '';
+    const srRegexLoose  = /\s*<script[^>]*id=["']social-replies["'][^>]*>[\s\S]*?<\/script>\s*/i;
+    const srRegexTight  = /<script[^>]*id=["']social-replies["'][^>]*>[\s\S]*?<\/script>/i;
+    let newFooter;
+    if (combined.length === 0) {
+      newFooter = existingFooter.replace(srRegexLoose, '').trim();
+    } else {
+      const block = buildBlock(combined);
+      if (srRegexTight.test(existingFooter)) {
+        newFooter = existingFooter.replace(srRegexTight, block);
+      } else {
+        newFooter = existingFooter ? existingFooter + '\n\n' + block : block;
+      }
+    }
+
+    els.saveBtn.disabled = true;
+    els.saveBtn.textContent = 'Saving…';
+    try {
+      const data = await ghostFetch(
+        '/posts/' + encodeURIComponent(state.selectedPost.id) + '/',
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            posts: [{
+              codeinjection_foot: newFooter,
+              updated_at: state.selectedPost.updated_at,
+            }],
+          }),
+        }
+      );
+      const summary = [];
+      if (added   > 0) summary.push(added + ' added');
+      if (removed > 0) summary.push(removed + ' removed');
+      toast('✓ Saved — ' + summary.join(', '), 'success');
+      state.existingUrls = combined;
+      state.pendingDeletions.clear();
+      if (data.posts && data.posts[0]) state.selectedPost = data.posts[0];
+      els.urlsDirect.value = '';
+      renderExisting();
+      renderNewDirect();
+    } catch (err) {
+      toast('Save failed: ' + err.message, 'error');
+    } finally {
+      els.saveBtn.disabled = false;
+      els.saveBtn.textContent = 'Save to Ghost';
+    }
+  });
+
+  els.clearDirectBtn.addEventListener('click', () => {
+    els.urlsDirect.value = '';
+    renderNewDirect();
+  });
+})();
+</script>
+</body>
+</html>
