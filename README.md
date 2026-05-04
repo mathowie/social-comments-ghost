@@ -111,4 +111,4 @@ MIT. See [LICENSE](LICENSE).
 
 ## Credits
 
-Built originally for [A Whole Lotta Nothing](https://a.wholelottanothing.org). Released for anyone who wants the same feature on their Ghost blog.
+Built originally for [A Whole Lotta Nothing](https://a.wholelottanothing.org). Released for anyone who wants the same feature on their Ghost blog. [This post](https://a.wholelottanothing.org/announcing-social-comments-for-ghost/) contains a full explanation of how the project came to be. 
