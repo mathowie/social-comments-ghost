@@ -43,9 +43,6 @@ Two flavors are included:
 - **`helper/replies-helper.html` + `helper/ghost-replies-proxy.php`** — the full helper, requires a PHP-capable server and your Ghost API information and automatically appends any social mentions to your post instantly.
 - **`helper/replies-helper-standalone.html`** — a single self-contained file. No server needed. Offline mode builds the script block that you'll paste into Ghost manually. There's also an opt-in direct mode that talks to Ghost's Admin API straight from the browser (in-browser JWT, CORS permitting), skipping the copy/paste step.
 
-### 2. Get your Ghost API key for your blog
-
-To save your settings in either Helper, go to your Ghost blog's settings, then the Integrations. Create a new custom integration, give it a name, then copy the Admin API key as well as the API URL to save in the helper app's code.
 
 ## Adding replies to a post (no helper)
 
@@ -72,6 +69,8 @@ That's it. Replies render on next page load.
 
 ## Adding replies (with the helper)
 
+To save your Ghost server settings in the Helper pages, go to your Ghost blog's settings, then the Integrations. Create a new custom integration, give it a name, then copy the Admin API key as well as the API URL to save in the helper app's code.
+
 1. Open `replies-helper.html` in your browser
 2. Search and pick a post
 3. Paste URLs (one per line) in the textarea
@@ -84,14 +83,14 @@ The helper handles JSON formatting, deduplication, and removal of existing entri
 - **Ghost** — works on Ghost(Pro) and self-hosted Ghost 5.x and 6.x
 - **Themes** — Casper, Source, custom themes, Liebling, etc. The integration is theme-agnostic
 - **Browsers** — modern evergreen browsers (Chrome, Safari, Firefox, Edge). Uses `fetch`, `Promise.all`, and CSS custom properties
-- **Mastodon** — any instance, any version with the v1 API (effectively all of them)
+- **Mastodon** — public posts from any instance, any version with the v1 API
 - **Bluesky** — public posts only
 
 ## What this is NOT
 
 - Not webmentions — there's no incoming federation. You curate which replies appear.
 - Not real-time — replies render at page load, no websockets or live updates
-- Not a comment system — it's a one-way display of social-platform replies. Readers can't post directly to your blog (use Ghost's built-in comments for that, alongside this)
+- Not an automatic comment system — it's a one-way display of social-platform replies. Readers can't post directly to your blog (use Ghost's built-in comments for that, alongside this)
 - Not analytics-aware — replies are fetched fresh each visit, no view tracking
 
 ## Contributing
