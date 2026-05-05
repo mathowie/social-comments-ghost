@@ -9,3 +9,6 @@ node_modules/
 
 # Don't commit configured proxy with secrets
 helper/ghost-replies-proxy.local.php
+
+# Local sandbox / test Ghost theme — not part of the published code
+sandbox-blog/
